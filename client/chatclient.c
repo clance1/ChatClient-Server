@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
 	printf("Connection established\n");
 
 
-    //While loop
+    //While loop handles password checking
     while(1){
         //recieve greeting
 		char greet[BUFSIZ];
@@ -83,8 +83,6 @@ int main(int argc, char *argv[]) {
 		char password[50];
 		fgets(password, 50, stdin);
 		int password_sent = char_send(sockfd, password, strlen(password));
-
-
 
     }
 }
