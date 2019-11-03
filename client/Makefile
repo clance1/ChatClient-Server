@@ -1,5 +1,5 @@
 all:
-	gcc chatclient.c -o chatclient -lcrypto -lssl
+	gcc chatclient.c -o chatclient
 
 clean:
 	-rm chatclient

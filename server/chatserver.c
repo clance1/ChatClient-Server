@@ -25,7 +25,7 @@ int main(int argc , char *argv[]){
     int socket_desc , client_sock , c;
     struct sockaddr_in server , client;
     int PORT = atoi(argv[1]);
-     
+
     //Create socket
     socket_desc = socket(AF_INET , SOCK_STREAM , 0);
     if (socket_desc == -1)
@@ -33,12 +33,12 @@ int main(int argc , char *argv[]){
         printf("Could not create socket");
     }
     puts("Socket created");
-     
+
     //Prepare the sockaddr_in structure
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = INADDR_ANY;
     server.sin_port = htons( PORT );
-     
+
     //Bind
     if( bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0)
     {
@@ -47,15 +47,15 @@ int main(int argc , char *argv[]){
         return 1;
     }
     puts("bind done");
-     
+
     //Listen
     listen(socket_desc , 3);
-     
+
     //Accept and incoming connection
     puts("Waiting for incoming connections...");
     c = sizeof(struct sockaddr_in);
-     
-     
+
+
     //Accept and incoming connection
     puts("Waiting for incoming connections...");
     c = sizeof(struct sockaddr_in);
@@ -71,7 +71,7 @@ int main(int argc , char *argv[]){
             perror("could not create thread");
             return 1;
         }
-        
+
         puts("Handler assigned");
 
     }
@@ -82,7 +82,7 @@ int main(int argc , char *argv[]){
         perror("accept failed");
         return 1;
     }
-	
+
     return 0;
 }
 
@@ -100,7 +100,7 @@ void *connection_handler(void *socket_desc)
     //Send some messages to the client
     message = "Greetings! I am your connection handler\n";
     write(sock , message , strlen(message));
-    
+
     //while loop handles username checking
     while (!usercheck){
 
@@ -111,9 +111,9 @@ void *connection_handler(void *socket_desc)
         //receive username
         char username[BUFSIZ];
         memset(username, 0, sizeof(username));
-	    int username_received = char_recv(sock, username, sizeof(username));
-        username[username_received] = '\0';
-        printf("%s", username);
+	      int username_received = char_recv(sock, username, sizeof(username));
+
+        printf("Username:%s.\n", username);
 
         //username checker
         usercheck = username_checker(username);
@@ -147,14 +147,14 @@ void *connection_handler(void *socket_desc)
     {
         //end of string marker
 		client_message[read_size] = '\0';
-		
+
 		//Send the message back to client
         //write(sock , client_message , strlen(client_message));
-		
+
 		//clear the message buffer
 		memset(client_message, 0, 2000);
     }
-     
+
     if(read_size == 0)
     {
         puts("Client disconnected");
@@ -164,9 +164,9 @@ void *connection_handler(void *socket_desc)
     {
         perror("recv failed");
     }
-     */    
+     */
     return 0;
-} 
+}
 
 //password checking function
 bool username_checker(char* username){
@@ -189,24 +189,28 @@ bool username_checker(char* username){
     //loop through file and check for preexisting usernames
     while(fgets(user, sizeof(user), fp) != NULL){
         puts("checking username");
+        size_t ln = strlen(username) - 1;
+        if (username[ln] == '\n')
+    		  username[ln] = '\0';
+        printf("Sent name:%s.\n",username);
+        size_t l = strlen(user) - 1;
+        if (user[l] == '\n')
+    		  user[l] = '\0';
+        printf("Fetched name:%s.\n",user);
         //increment count
         count++;
         //check if username exists in right position
-        if(user == username){
+        if(!strcmp(user, username)){
             puts("existing user");
             return true;
-        }
-        else{
-            //add new username and password
-            puts("new user created");
-            
         }
     }
     fclose(fp);
 
     //add new username
+    printf("Creating new user: %s\n", username);
     fp = fopen("passwords.txt", "a");
-    fprintf(fp, "%s", username);
+    fprintf(fp, "%s\n", username);
     fclose(fp);
 
     return true;
@@ -234,7 +238,7 @@ bool password_checker(char* username, char* password){
             //add new username and password
             fprintf(fp, "%s\n", username);
             fprintf(fp, "%s\n", password);
-            
+
         }
     }
 

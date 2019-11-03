@@ -67,11 +67,12 @@ int main(int argc, char *argv[]) {
 		//recieve username request
 		memset(greet, 0, sizeof(greet));
 		int username_received = char_recv(sockfd, greet, sizeof(greet));
-		printf("%s", greet);	
+		printf("%s", greet);
 
 		//return username request
 		char username[50];
 		fgets(username, 50, stdin);
+		printf("Entered username:%s", username);
 		int username_sent = char_send(sockfd, username, strlen(username));
 
 		//revieve password request

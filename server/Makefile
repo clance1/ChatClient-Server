@@ -1,6 +1,5 @@
 all:
-	gcc chatserver.c -o chatserver -lcrypto -lssl -lpthread
+	gcc chatserver.c -o chatserver -lpthread
 
 clean:
 	-rm chatserver
-
