@@ -1,5 +1,7 @@
 /*  server.c
     Cole Pickford
+    Carson Lance
+    Jack Conway
 */
 
 #include<stdio.h>
@@ -50,11 +52,6 @@ int main(int argc , char *argv[]){
 
     //Listen
     listen(socket_desc , 3);
-
-    //Accept and incoming connection
-    puts("Waiting for incoming connections...");
-    c = sizeof(struct sockaddr_in);
-
 
     //Accept and incoming connection
     puts("Waiting for incoming connections...");
@@ -111,7 +108,7 @@ void *connection_handler(void *socket_desc) {
         //receive username
         memset(username, 0, sizeof(username));
 	      int username_received = char_recv(sock, username, sizeof(username));
-        printf("Username:%s.\n", username);
+        printf("Username: %s", username);
         //username checker
         usercheck = username_checker(username);
     }
@@ -126,13 +123,15 @@ void *connection_handler(void *socket_desc) {
         char password[BUFSIZ];
         memset(password, 0, sizeof(password));
 	      int password_received = char_recv(sock, password, sizeof(password));
-        password[password_received] = '\0';
-        printf("%s", password);
+        printf("Username: %s\n", username);
+        printf("Password: %s", password);
 
         //password checker
         passcheck = password_checker(username, password);
 
     }
+    message = "Login Successful";
+    write(sock, message, strlen(message));
 
     /*
     //Receive a message from client
@@ -194,6 +193,7 @@ bool username_checker(char* username){
         //check if username exists in right position
         if(!strcmp(user, username)){
             puts("Existing user");
+            fclose(fp);
             return true;
         }
     }
@@ -201,34 +201,51 @@ bool username_checker(char* username){
     //add new username
     printf("Creating new user: %s\n", username);
     fprintf(fp, "%s\n", username);
+    printf("Enter your password: ");
+    char pass[50];
+    fgets(pass, sizeof(pass), stdin);
+    fprintf(fp, "%s", pass);
+    char file_ending[BUFSIZ] = ".chat";
+    strcat(username, file_ending);
+    FILE *hist_fp = fopen(username, "w+");
+    fclose(hist_fp);
+    fclose(fp);
     return true;
 }
 
 //password checking function
 bool password_checker(char* username, char* password){
     //file can be every other line username and password checking until end of file
-    FILE *fp = fopen("passwords.txt", "a");
+    FILE *fip = fopen("passwords.txt", "r");
     //file lines
     char user[50];
     char pass[50];
     //loop through file and check for preexisting usernames
-    while(fgets(user, sizeof(user), fp)){
+    while(fgets(user, sizeof(user), fip)){
         //check if username exists
+        size_t ln = strlen(user) - 1;
+        if (user[ln] == '\n')
+    		  user[ln] = '\0';
         if(!strcmp(user, username)){
             //check next line for password
-            fgets(pass, sizeof(pass), fp);
+            fgets(pass, sizeof(pass), fip);
+            // Strips newline char from both
+            size_t l = strlen(pass) - 1;
+            if (pass[l] == '\n')
+        		  pass[l] = '\0';
+            size_t lp = strlen(password) - 1;
+            if (password[lp] == '\n')
+          		 password[lp] = '\0';
             if(!strcmp(pass, password)){
                 //username and password already exist
                 printf("Passwords match");
                 return true;
             }
+            else {
+              return false;
+            }
         }
     }
-    //add new username and password
-    printf("Adding new username and password\n");
-    fprintf(fp, "%s\n", username);
-    fprintf(fp, "%s\n", password);
-
 }
 
 //send strings

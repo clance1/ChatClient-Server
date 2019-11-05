@@ -1,5 +1,7 @@
 /*  client.c
     Cole Pickford
+		Carson Lance
+		Jack Conway
 */
 
 #include <stdlib.h>
@@ -22,6 +24,9 @@ int char_send(int, char*, int);
 int char_recv(int, char*, int);
 int int_send(int, int);
 int int_recv(int);
+void broadcast(int);
+void private(int);
+void history(int);
 
 int main(int argc, char *argv[]) {
     // Check argument count
@@ -59,33 +64,71 @@ int main(int argc, char *argv[]) {
     //While loop handles password checking
     while(1){
         //recieve greeting
-		char greet[BUFSIZ];
-		memset(greet, 0, sizeof(greet));
-		int greet_received = char_recv(sockfd, greet, sizeof(greet));
-		printf("%s", greet);
+				char greet[BUFSIZ];
+				memset(greet, 0, sizeof(greet));
+				int greet_received = char_recv(sockfd, greet, sizeof(greet));
+				printf("%s", greet);
 
-		//recieve username request
-		memset(greet, 0, sizeof(greet));
-		int username_received = char_recv(sockfd, greet, sizeof(greet));
-		printf("%s", greet);
+				//recieve username request
+				memset(greet, 0, sizeof(greet));
+				int username_received = char_recv(sockfd, greet, sizeof(greet));
+				printf("%s", greet);
 
-		//return username request
-		char username[50];
-		fgets(username, 50, stdin);
-		printf("Entered username:%s", username);
-		int username_sent = char_send(sockfd, username, strlen(username));
+				//return username request
+				char username[50];
+				fgets(username, 50, stdin);
+				printf("Entered username:%s", username);
+				int username_sent = char_send(sockfd, username, strlen(username));
 
-		//revieve password request
-		memset(greet, 0, sizeof(greet));
-		int password_received = char_recv(sockfd, greet, sizeof(greet));
-		printf("%s", greet);
+				//revieve password request
+				memset(greet, 0, sizeof(greet));
+				int password_received = char_recv(sockfd, greet, sizeof(greet));
+				printf("%s", greet);
 
-		//return password request
-		char password[50];
-		fgets(password, 50, stdin);
-		int password_sent = char_send(sockfd, password, strlen(password));
+				//return password request
+				char password[50];
+				fgets(password, 50, stdin);
+				int password_sent = char_send(sockfd, password, strlen(password));
 
+				//revieve password acknowledgement
+				memset(greet, 0, sizeof(greet));
+				int password_acknowledgment = char_recv(sockfd, greet, sizeof(greet));
+				printf("%s", greet);
+
+				char input[50];
+				while(strcmp(input, "X")) {
+					printf("Enter operation\n");
+					printf("B: Broadcast Messaging\n P: Private Messaging\nH: Show History\nX: Exit");
+					fgets(input, sizeof(input), stdin);
+					size_t l = strlen(input) - 1;
+					if (input[l] == '\n')
+						input[l] = '\0';
+
+					if (!strcmp(input, "B")) {
+						printf("Broadcast selected\n");
+						broadcast(sockfd);
+					}
+					else if (!strcmp(input, "P")) {
+						printf("Private message selected\n");
+						private(sockfd);
+					}
+					else if (!strcmp(input, "H")) {
+						printf("History selected\n");
+						history(sockfd);
+					}
+					else if (!strcmp(input, "X")) {
+						printf("Exiting\n");
+						char exit[BUFSIZ] = "X";
+						int exit_send = char_send(sockfd, exit, sizeof(exit));
+					}
+					else {
+						printf("Invalid Selection\n");
+					}
+				}
+				break;
     }
+		close(sockfd);
+		return 0;
 }
 
 //send strings
@@ -133,4 +176,81 @@ int int_recv(int sockfd) {
 
 	int temp = ntohl(buffer);
 	return temp;
+}
+
+void broadcast(int sockfd) {
+	// Communicate inital broadcast with server
+	char initiate[50] = "broadcast";
+	int initate_response = char_send(sockfd, initiate, 50);
+
+	// Receive acknowledgement
+	char greet[BUFSIZ];
+	memset(greet, 0, sizeof(greet));
+	int greet_received = char_recv(sockfd, greet, sizeof(greet));
+	printf("%s", greet);
+
+	// Send message
+	char message[BUFSIZ];
+	printf("Enter your message to be broadcasted:");
+	fgets(message, sizeof(message), stdin);
+	int broadcast_send = char_send(sockfd, message, sizeof(message));
+
+	// Receive confimation
+	int confirmation = int_recv(sockfd);
+
+	if (confirmation == 0) {
+		printf("Broadcast Successful\n");
+	}
+	else {
+		printf("Error with broadcast\n");
+	}
+}
+
+void private(int sockfd) {
+	// Communicate inital state with server
+	char initiate[50] = "private";
+	int initate_response = char_send(sockfd, initiate, 50);
+
+	printf("List of online users:\n");
+	// Receive acknowledgement
+	char users[BUFSIZ];
+	memset(users, 0, sizeof(users));
+	int users_received = char_recv(sockfd, users, sizeof(users));
+	printf("%s", users);
+
+	// Select user
+	char user_selected[BUFSIZ];
+	printf("Enter the user you would like to slide into dms with: ");
+	fgets(user_selected,  sizeof(user_selected), stdin);
+	int user_send = char_send(sockfd, user_selected, sizeof(user_selected));
+
+	// Enter message
+	char message[BUFSIZ];
+	printf("Enter message to be sent:\n");
+	fgets(message, sizeof(message), stdin);
+	int message_send = char_send(sockfd, message, sizeof(message));
+
+	// Receive acknowledgement
+	int confimation = int_recv(sockfd);
+	if (confimation == 0) {
+		printf("Message sent\n");
+	}
+	else if (confimation == 1) {
+		printf("User not found\n");
+	}
+	else {
+		printf("Miscelaneous error\n");
+	}
+}
+
+void history(int sockfd) {
+	// Communicate inital state with server
+	char initiate[50] = "history";
+	int initate_response = char_send(sockfd, initiate, 50);
+
+	// Receive History
+	char history[BUFSIZ];
+	memset(history, 0, sizeof(history));
+	int hist_received = char_recv(sockfd, history, sizeof(history));
+	printf("%s", history);
 }
