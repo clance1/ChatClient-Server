@@ -22,6 +22,10 @@ int int_recv(int);
 bool username_checker(char*, int);
 bool password_checker(char*, char*);
 
+// IDEA
+// Make a struct that contains the username and thread that will be passed with functions
+// This will make thread tracking easier. I think
+
 
 int main(int argc , char *argv[]){
     int socket_desc , client_sock , c;
@@ -56,21 +60,19 @@ int main(int argc , char *argv[]){
     //Accept and incoming connection
     puts("Waiting for incoming connections...");
     c = sizeof(struct sockaddr_in);
-	pthread_t thread_id;
+	  pthread_t thread_id;
 
     //While loop will accept multiple clients
     while( (client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c)) ){
         puts("Connection accepted");
 
         //creates thread
-        if( pthread_create( &thread_id , NULL ,  connection_handler , (void*) &client_sock) < 0)
-        {
+        if(pthread_create( &thread_id , NULL ,  connection_handler , (void*) &client_sock) < 0){
             perror("could not create thread");
             return 1;
         }
-
+        printf("Thread ID: %d\n", thread_id);
         puts("Handler assigned");
-
     }
 
     //handle failed accept
@@ -113,6 +115,7 @@ void *connection_handler(void *socket_desc) {
         usercheck = username_checker(username, sock);
     }
 
+    printf("Exited Username loop\n");
     //while loop checking password
     while(!passcheck){
         //ask for password
@@ -128,17 +131,18 @@ void *connection_handler(void *socket_desc) {
 
         //password checker
         passcheck = password_checker(username, password);
-
+        printf("Password Check complete\n");
     }
-    message = "Login Successful";
+
+    message = "Login Successful\n";
     write(sock, message, strlen(message));
 
     //Receive a message from client
-    while( (read_size = recv(sock , client_message , 2000 , 0)) > 0 ) {
+    while((read_size = recv(sock , client_message , 2000 , 0)) > 0 ) {
         //end of string marker
         if (client_message[sizeof(client_message)-1] == '\n')
 		        client_message[read_size] = '\0';
-
+        printf("Message received: %s\n", client_message);
         // Check clients function
         if (!strcmp(client_message, "broadcast")) {
 
@@ -178,7 +182,7 @@ bool username_checker(char* username, int sockfd){
     char user[50];
     int count = 0;
     bool new_user = false;
-    fp = fopen("passwords.txt", "r");
+    fp = fopen("passwords.txt", "r+");
     //loop through file and check for preexisting usernames
     while(fgets(user, sizeof(user), fp) != NULL){
         // Strip newline char off recevied username
@@ -205,16 +209,11 @@ bool username_checker(char* username, int sockfd){
     int t = 1;
     status_send = int_send(t, sockfd);
     char* message;
-    printf("TEST\n");
-    message = "Created a new user\n";
-    write(sockfd, message , strlen(message));
-    memset(message, 0, sizeof(message));
-    message = "Please enter your password: \n";
-    write(sockfd, message , strlen(message));
 
+    message = "Created a new user\nPlease enter your password: \n";
+    write(sockfd, message , strlen(message));
     //receive password
     char pass[BUFSIZ];
-    memset(pass, 0, sizeof(pass));
     int password_received = char_recv(sockfd, pass, sizeof(pass));
     printf("Received password\n");
 
@@ -223,10 +222,14 @@ bool username_checker(char* username, int sockfd){
     fprintf(fp, "%s\n", username);
     fprintf(fp, "%s", pass);
 
+    char hist_file[BUFSIZ];
+    strcpy(hist_file, username);
+
     // Create history file
     char file_ending[BUFSIZ] = ".chat";
-    strcat(username, file_ending);
-    FILE *hist_fp = fopen(username, "w+");
+    strcat(hist_file, file_ending);
+    FILE *hist_fp = fopen(hist_file, "w+");
+    printf("Created history\n");
     fclose(hist_fp);
     fclose(fp);
     return true;
@@ -246,6 +249,7 @@ bool password_checker(char* username, char* password){
         if (user[ln] == '\n')
     		  user[ln] = '\0';
         if(!strcmp(user, username)){
+            printf("Found user\n");
             //check next line for password
             fgets(pass, sizeof(pass), fip);
             // Strips newline char from both
@@ -255,12 +259,15 @@ bool password_checker(char* username, char* password){
             size_t lp = strlen(password) - 1;
             if (password[lp] == '\n')
           		 password[lp] = '\0';
+            printf("Password found: %s\n", pass);
+            printf("Password comparing: %s\n", password);
             if(!strcmp(pass, password)){
                 //username and password already exist
-                printf("Passwords match");
+                printf("Passwords match\n");
                 return true;
             }
             else {
+              printf("Passwords do not match\n");
               return false;
             }
         }
