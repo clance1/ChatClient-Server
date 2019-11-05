@@ -23,6 +23,7 @@ int int_recv(int);
 bool username_checker(char*, int);
 bool password_checker(char*, char*);
 void write_history(char*, char*, char*);
+void send_history(char*, int);
 
 // IDEA
 // Make a struct that contains the username and thread that will be passed with functions
@@ -160,7 +161,7 @@ void *connection_handler(void *socket_desc) {
 
         }
         else if (!strcmp(client_message, "H")) {
-
+            send_history(username, sock);
         }
         else if (!strcmp(client_message, "X")) {
 
@@ -340,7 +341,6 @@ void write_history(char* username, char* message, char* action) {
   char file_ending[BUFSIZ] = ".chat";
   strcat(hist_file, file_ending);
 
-  printf("Opening %s for writing\n", hist_file);
   FILE *hist_fp = fopen(hist_file, "w");
 
   // Get time
@@ -366,8 +366,29 @@ void write_history(char* username, char* message, char* action) {
     strcat(hist_entry, quote);
   }
 
-  printf("hist_entry: %s\n", hist_entry);
   fprintf(hist_fp, "%s\n", hist_entry);
-  printf("Wrote to hist file\n");
+  fclose(hist_fp);
+}
+
+void send_history(char* username, int  sockfd) {
+  char hist_file[BUFSIZ];
+  strcpy(hist_file, username);
+  // Find history file
+  char file_ending[BUFSIZ] = ".chat";
+  strcat(hist_file, file_ending);
+
+  FILE *hist_fp = fopen(hist_file, "r");
+
+  char history[BUFSIZ] = "History for ";
+  strcat(history, username);
+  strcat(history, "\n");
+  char history_line[BUFSIZ];
+
+  while(fgets(history_line, sizeof(history_line), hist_fp)){
+      strcat(history, history_line);
+  }
+
+  printf("%s", history);
+  int send_hist = char_send(sockfd, history, sizeof(history));
   fclose(hist_fp);
 }
