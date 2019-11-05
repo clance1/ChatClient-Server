@@ -80,6 +80,26 @@ int main(int argc, char *argv[]) {
 				printf("Entered username:%s", username);
 				int username_sent = char_send(sockfd, username, strlen(username));
 
+				// Receive status
+				int status_recv = int_recv(sockfd);
+
+				// New user
+				if (status_recv == 1) {
+					// Receive new user creation ack
+					memset(greet, 0, sizeof(greet));
+					int creation = char_recv(sockfd, greet, sizeof(greet));
+					printf("%s", greet);
+
+					//revieve password request
+					memset(greet, 0, sizeof(greet));
+					int new_password_request = char_recv(sockfd, greet, sizeof(greet));
+					printf("%s", greet);
+
+					//return password request
+					char new_pass[50];
+					fgets(new_pass, 50, stdin);
+					int new_password_sent = char_send(sockfd, new_pass, strlen(new_pass));
+				}
 				//revieve password request
 				memset(greet, 0, sizeof(greet));
 				int password_received = char_recv(sockfd, greet, sizeof(greet));

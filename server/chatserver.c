@@ -19,7 +19,7 @@ int char_send(int, char*, int);
 int char_recv(int, char*, int);
 int int_send(int, int);
 int int_recv(int);
-bool username_checker(char*);
+bool username_checker(char*, int);
 bool password_checker(char*, char*);
 
 
@@ -110,7 +110,7 @@ void *connection_handler(void *socket_desc) {
 	      int username_received = char_recv(sock, username, sizeof(username));
         printf("Username: %s", username);
         //username checker
-        usercheck = username_checker(username);
+        usercheck = username_checker(username, sock);
     }
 
     //while loop checking password
@@ -133,35 +133,36 @@ void *connection_handler(void *socket_desc) {
     message = "Login Successful";
     write(sock, message, strlen(message));
 
-    /*
     //Receive a message from client
-    while( (read_size = recv(sock , client_message , 2000 , 0)) > 0 )
-    {
+    while( (read_size = recv(sock , client_message , 2000 , 0)) > 0 ) {
         //end of string marker
-		client_message[read_size] = '\0';
+        if (client_message[sizeof(client_message)-1] == '\n')
+		        client_message[read_size] = '\0';
 
-		//Send the message back to client
-        //write(sock , client_message , strlen(client_message));
+        // Check clients function
+        if (!strcmp(client_message, "broadcast")) {
 
-		//clear the message buffer
-		memset(client_message, 0, 2000);
+        }
+        else if (!strcmp(client_message, "private")) {
+
+        }
+        else if (!strcmp(client_message, "history")) {
+
+        }
+        else if (!strcmp(client_message, "X")) {
+
+        }
+        else {
+
+        }
     }
 
-    if(read_size == 0)
-    {
-        puts("Client disconnected");
-        fflush(stdout);
-    }
-    else if(read_size == -1)
-    {
-        perror("recv failed");
-    }
-     */
     return 0;
 }
 
 //password checking function
-bool username_checker(char* username){
+bool username_checker(char* username, int sockfd){
+    int status_send;
     //file can be every other line username and password checking until end of file
     FILE *fp = fopen("passwords.txt", "a");
     //check file existence
@@ -193,18 +194,36 @@ bool username_checker(char* username){
         //check if username exists in right position
         if(!strcmp(user, username)){
             puts("Existing user");
+            int t = 0;
+            status_send = int_send(t, sockfd);
             fclose(fp);
             return true;
         }
     }
 
+    printf("Creating new user: %s\n", username);
+    int t = 1;
+    status_send = int_send(t, sockfd);
+    char* message;
+    printf("TEST\n");
+    message = "Created a new user\n";
+    write(sockfd, message , strlen(message));
+    memset(message, 0, sizeof(message));
+    message = "Please enter your password: \n";
+    write(sockfd, message , strlen(message));
+
+    //receive password
+    char pass[BUFSIZ];
+    memset(pass, 0, sizeof(pass));
+    int password_received = char_recv(sockfd, pass, sizeof(pass));
+    printf("Received password\n");
+
     //add new username
     printf("Creating new user: %s\n", username);
     fprintf(fp, "%s\n", username);
-    printf("Enter your password: ");
-    char pass[50];
-    fgets(pass, sizeof(pass), stdin);
     fprintf(fp, "%s", pass);
+
+    // Create history file
     char file_ending[BUFSIZ] = ".chat";
     strcat(username, file_ending);
     FILE *hist_fp = fopen(username, "w+");
@@ -277,7 +296,6 @@ int int_send(int value, int sockfd) {
 		perror("ERROR: Sending size");
 		exit(1);
 	}
-
 	return len;
 }
 
