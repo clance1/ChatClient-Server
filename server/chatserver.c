@@ -12,6 +12,7 @@
 #include<unistd.h>    //write
 #include<pthread.h> //for threading , link with lpthread
 #include<stdbool.h>
+#include<time.h>
 
 //the thread function
 void *connection_handler(void *);
@@ -21,6 +22,7 @@ int int_send(int, int);
 int int_recv(int);
 bool username_checker(char*, int);
 bool password_checker(char*, char*);
+void write_history(char*, char*, char*);
 
 // IDEA
 // Make a struct that contains the username and thread that will be passed with functions
@@ -144,13 +146,20 @@ void *connection_handler(void *socket_desc) {
 		        client_message[read_size] = '\0';
         printf("Message received: %s\n", client_message);
         // Check clients function
-        if (!strcmp(client_message, "broadcast")) {
+        if (!strcmp(client_message, "B")) {
+            //ask for message
+            message = "Please enter your message: \n";
+            write(sock , message , strlen(message));
+
+            // Receive message and write to history
+            char broadcast_message[BUFSIZ];
+            int broadcast_recv = char_recv(sock, broadcast_message, sizeof(broadcast_message));
+            write_history(username, broadcast_message, client_message);
+        }
+        else if (!strcmp(client_message, "P")) {
 
         }
-        else if (!strcmp(client_message, "private")) {
-
-        }
-        else if (!strcmp(client_message, "history")) {
+        else if (!strcmp(client_message, "H")) {
 
         }
         else if (!strcmp(client_message, "X")) {
@@ -318,4 +327,47 @@ int int_recv(int sockfd) {
 
 	int temp = ntohl(buffer);
 	return temp;
+}
+
+void write_history(char* username, char* message, char* action) {
+  char hist_file[BUFSIZ];
+  strcpy(hist_file, username);
+  char space[BUFSIZ] = " ";
+  char mess[BUFSIZ] = "Message: \"";
+  char quote[BUFSIZ] = "\"";
+
+  // Find history file
+  char file_ending[BUFSIZ] = ".chat";
+  strcat(hist_file, file_ending);
+
+  printf("Opening %s for writing\n", hist_file);
+  FILE *hist_fp = fopen(hist_file, "w");
+
+  // Get time
+  time_t t = time(NULL);
+  struct tm tm = *localtime(&t);
+  char date[BUFSIZ];
+  sprintf(date, "Date: %d-%d-%d %d:%d ", tm.tm_year + 1900, tm.tm_mon + 1,tm.tm_mday, tm.tm_hour, tm.tm_min);
+
+  char hist_entry[BUFSIZ];
+  strcat(hist_entry, date);
+
+  size_t lp = strlen(message) - 1;
+  if (message[lp] == '\n')
+     message[lp] = '\0';
+
+  if (!strcmp(action, "B")) {
+    char action_full[BUFSIZ] = "Action: Broadcast User: ";
+    strcat(hist_entry, action_full);
+    strcat(hist_entry, username);
+    strcat(hist_entry, space);
+    strcat(hist_entry, mess);
+    strcat(hist_entry, message);
+    strcat(hist_entry, quote);
+  }
+
+  printf("hist_entry: %s\n", hist_entry);
+  fprintf(hist_fp, "%s\n", hist_entry);
+  printf("Wrote to hist file\n");
+  fclose(hist_fp);
 }
