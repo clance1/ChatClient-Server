@@ -1,7 +1,9 @@
-/*  client.c
-    Cole Pickford
-		Carson Lance
-		Jack Conway
+/*  chatclient.cpp
+    Cole Pickford (cpickfor)
+		Carson Lance (clance1)
+		Jack Conway (jconway7)
+
+		USAGE: ./chatclient ADDR PORT USERNAME
 */
 
 #include <iostream>
@@ -28,6 +30,8 @@ bool ack, confirmed, result;
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
+char* format_char = "-----------------------------------\n";
+
 void *connection_handler(void *);
 int char_send(int, char*, int);
 int char_recv(int, char*, int);
@@ -40,7 +44,7 @@ bool confirmation_handler();
 
 int main(int argc, char *argv[]) {
     // Check argument count
-	if(argc != 3) {
+	if(argc != 4) {
 		printf("%s: Incorrect usage.\n Usage: %s ADDR PORT USERNAME\n", argv[0], argv[0]);
 		exit(1);
 	}
@@ -78,8 +82,9 @@ int main(int argc, char *argv[]) {
 
 
 	//return username request
-	char username[50] = argv[3];
-	printf("Entered username:%s", username);
+	char username[50];
+	strcpy(username, argv[3]);
+	printf("%sLogging in as %s\n%s", format_char, username, format_char);
 	int username_sent = char_send(sockfd, username, strlen(username));
 
 	// Receive status
@@ -151,7 +156,7 @@ int main(int argc, char *argv[]) {
 			acknowledgement_handler();
 		}
 		else if (!strcmp(input, "X")) {
-			printf("Exiting\n");
+			printf("Exiting chat server\n");
 			acknowledgement_handler();
 			pthread_join(thread_id, NULL);
 			break;
@@ -186,7 +191,6 @@ void *connection_handler(void *sock) {
 				result = false;
 			}
 			else if (!strcmp(message, "EXIT")) {
-				cout << "EXITING" << endl;
 				ack = true;
 				confirmed = true;
 				result = true;
@@ -197,7 +201,6 @@ void *connection_handler(void *sock) {
 				printf("%s", message);
 				fflush(stdout);
 				pthread_mutex_unlock(&mutex);
-				cout << "Unlocked" << endl;
 			}
 		}
 		return 0;
@@ -262,10 +265,10 @@ void broadcast(int sockfd) {
 	fflush(stdout);
 
 	if (confirmation_handler()) {
-		printf("Broadcast Successful\n");
+		printf("\n");
 	}
 	else {
-		printf("Error with broadcast\n");
+		printf("\nError with broadcast\n");
 	}
 }
 
@@ -275,7 +278,7 @@ void private_chat(int sockfd, char* username) {
 
 	// Select user
 	char user_selected[BUFSIZ];
-	printf("Enter the user you would like to slide into dms with: ");
+	printf("Enter the user you would like to message: ");
 	fgets(user_selected,  sizeof(user_selected), stdin);
 	int user_send = char_send(sockfd, user_selected, sizeof(user_selected));
 	fflush(stdout);
@@ -288,10 +291,10 @@ void private_chat(int sockfd, char* username) {
 	int message_send = char_send(sockfd, message, sizeof(message));
 
 	if (confirmation_handler()) {
-		printf("Successfully sent.\n");
+		printf("\nSuccessfully sent.\n");
 	}
 	else {
-		printf("User does not exist\n");
+		printf("\nUser does not exist\n");
 	}
 }
 
