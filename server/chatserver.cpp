@@ -13,6 +13,14 @@
 #include<pthread.h> //for threading , link with lpthread
 #include<stdbool.h>
 #include<time.h>
+#include<vector>
+#include<fstream>
+#include<string>
+#include<iostream>
+#include<cstdio>
+#include<iterator>
+
+using namespace std;
 
 //the thread function
 void *connection_handler(void *);
@@ -24,6 +32,8 @@ bool username_checker(char*, int);
 bool password_checker(char*, char*);
 void write_history(char*, char*, char*);
 void send_history(char*, int);
+void exit_process(char*, int);
+void broadcast(char*);
 
 
 int main(int argc , char *argv[]){
@@ -55,6 +65,7 @@ int main(int argc , char *argv[]){
 
     //Listen
     listen(socket_desc , 3);
+
     //Accept and incoming connection
     puts("Waiting for incoming connections...");
     c = sizeof(struct sockaddr_in);
@@ -128,7 +139,10 @@ void *connection_handler(void *socket_desc) {
 
     FILE *users_fp = fopen("users.txt", "a");
     fprintf(users_fp, "%s\n", username);
-    fprintf(users_fp, "%s\n", sock);
+    char sock_string[BUFSIZ];
+    sprintf(sock_string, "%d", sock);
+    fprintf(users_fp, "%s\n", sock_string);
+    fclose(users_fp);
 
     message = "Login Successful\n";
     write(sock, message, strlen(message));
@@ -158,7 +172,7 @@ void *connection_handler(void *socket_desc) {
             send_history(username, sock);
         }
         else if (!strcmp(client_message, "X")) {
-
+            exit_process(username, sock);
         }
         else {
 
@@ -384,15 +398,56 @@ void send_history(char* username, int  sockfd) {
   fclose(hist_fp);
 }
 
-/*
+
 void exit_process(char* username, int sockfd) {
-  FILE *user_fp = fopen("users.txt", "rw");
 
-  char temp[BUFSIZ];
-  char
-  while(fgets(temp, sizeof(user), fip)){
+  ifstream ifs;
+  vector <string> v;
+  string n, user, sock;
 
+  user = string(username);
+  sock = to_string(sockfd);
+
+  ifs.open("users.txt");
+
+  // Fills the vector
+  while (getline(ifs, n)) {
+    if (n.compare(user) == 0) {
+      continue;
+    }
+    else if (n.compare(sock) == 0) {
+      continue;
+    }
+    cout << n << "." << endl;
+    v.push_back(n);
   }
 
+  ifs.close();
+
+  system("rm users.txt");
+  system("touch users.txt");
+
+
+  ofstream ofs;
+  ofs.open("users.txt");
+  for (vector<string>::iterator it = v.begin() ; it != v.end(); ++it) {
+    ofs << *it << endl;
+  }
+  ofs.close();
 }
-*/
+
+void broadcast(char* message) {
+    ifstream ifs;
+    ifs.open("users.txt");
+    vector<int> socks;
+
+    int count = 1;
+    string n;
+    int t;
+    while (getline(ifs, n)) {
+      if (count % 2 == 0) {
+        t = char_send(stoi(n), message, sizeof(message));
+      }
+      count++;
+    }
+}

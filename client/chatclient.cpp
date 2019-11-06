@@ -4,6 +4,8 @@
 		Jack Conway
 */
 
+#include <iostream>
+#include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -20,12 +22,13 @@
 #define SERVER_PORT 41036
 #define MIN(a,b) (((a)<(b)) ? (a) : (b))
 
+void *connection_handler(void *);
 int char_send(int, char*, int);
 int char_recv(int, char*, int);
 int int_send(int, int);
 int int_recv(int);
 void broadcast(int);
-void private(int);
+void private_chat(int);
 void history(int);
 
 int main(int argc, char *argv[]) {
@@ -60,7 +63,11 @@ int main(int argc, char *argv[]) {
 	}
 	printf("Connection established\n");
 
-
+	 pthread_t thread_id;
+	if(pthread_create( &thread_id , NULL ,  connection_handler , (void*) &sockfd) < 0){
+			perror("could not create thread");
+			return 1;
+	}
 
   //recieve greeting
 	char greet[BUFSIZ];
@@ -81,7 +88,7 @@ int main(int argc, char *argv[]) {
 
 	// Receive status
 	int status_recv = int_recv(sockfd);
-	
+
 	// New user
 	if (status_recv == 1) {
 		// Receive new user creation ack
@@ -129,7 +136,7 @@ int main(int argc, char *argv[]) {
 			}
 			else if (!strcmp(input, "P")) {
 				printf("Private message selected\n");
-				private(sockfd);
+				private_chat(sockfd);
 			}
 			else if (!strcmp(input, "H")) {
 				printf("History selected\n");
@@ -146,6 +153,17 @@ int main(int argc, char *argv[]) {
 		}
 		close(sockfd);
 		return 0;
+}
+
+void *connection_handler(void *sockfd) {
+
+		int sock = *(int*)sockfd;
+
+		//recieve greeting
+		char greet[BUFSIZ];
+		memset(greet, 0, sizeof(greet));
+		int greet_received = char_recv(sock, greet, sizeof(greet));
+		printf("%s", greet);
 }
 
 //send strings
@@ -222,7 +240,7 @@ void broadcast(int sockfd) {
 	}
 }
 
-void private(int sockfd) {
+void private_chat(int sockfd) {
 	// Communicate inital state with server
 	char initiate[50] = "P";
 	int initate_response = char_send(sockfd, initiate, 50);
