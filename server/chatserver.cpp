@@ -1,7 +1,9 @@
-/*  server.c
-    Cole Pickford
-    Carson Lance
-    Jack Conway
+/*  chatserver.cpp
+    Cole Pickford (cpickfor)
+    Carson Lance (clance1)
+    Jack Conway (jconway7)
+
+    Usage: ./chatserver PORT
 */
 
 #include<stdio.h>
@@ -40,32 +42,27 @@ void private_chat(char*, char*, char*, int);
 char* ack = "ACK";
 char* succ = "SUCCESS";
 char* fail = "FAILURE";
-char* mess_format = "################## ";
-char* from_format = " Message received from ";
-char* me_format = "New Message! ";
+char* mess_format = "################## New Message! ##################\n";
+char* end_mess_format = "##################################################\n";
 
 
 int main(int argc , char *argv[]){
     int socket_desc , client_sock , c;
     struct sockaddr_in server , client;
-    int PORT = atoi(argv[1]);
+    int port = atoi(argv[1]);
 
-    if (argc != 2) {
-        printf("USAGE: ./chatserver PORT");
-        return 1;
-    }
     //Create socket
     socket_desc = socket(AF_INET , SOCK_STREAM , 0);
     if (socket_desc == -1)
     {
         printf("Could not create socket");
     }
-    puts("Socket created");
+    printf("%s\tStarting Chat Server on Port #%d\n%s", end_mess_format, port, end_mess_format);
 
     //Prepare the sockaddr_in structure
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = INADDR_ANY;
-    server.sin_port = htons( PORT );
+    server.sin_port = htons(port);
 
     //Bind
     if( bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0)
@@ -74,7 +71,6 @@ int main(int argc , char *argv[]){
         perror("bind failed. Error");
         return 1;
     }
-    puts("bind done");
 
     //Listen
     listen(socket_desc , 3);
@@ -98,8 +94,6 @@ int main(int argc , char *argv[]){
             perror("could not create thread");
             return 1;
         }
-        printf("Handler assigned: %d\n", thread_id);
-        printf("Socket: %d\n", client_sock);
     }
 
     //handle failed accept
@@ -122,7 +116,7 @@ void *connection_handler(void *socket_desc) {
     char *message , client_message[2000];
 
     //Send some messages to the client
-    message = "Greetings! I am your connection handler\n";
+    message = "You have successfully connected to the chat server\n";
     write(sock , message , strlen(message));
 
     char username[BUFSIZ];
@@ -139,7 +133,7 @@ void *connection_handler(void *socket_desc) {
     //while loop checking password
     while(!passcheck){
         //ask for password
-        message = "Please enter your password: \n";
+        message = "Please enter your password: ";
         int blah = char_send(sock , message , strlen(message));
 
         //receive password
@@ -158,6 +152,7 @@ void *connection_handler(void *socket_desc) {
     fprintf(users_fp, "%s\n", sock_string);
     fclose(users_fp);
 
+    printf("%s - Logged in Successfully\n", username);
     message = "Login Successful\n";
     int blah = char_send(sock, message, strlen(message));
 
@@ -166,7 +161,6 @@ void *connection_handler(void *socket_desc) {
         //end of string marker
         if (client_message[sizeof(client_message)-1] == '\n')
 		        client_message[read_size] = '\0';
-        printf("Action: %s\n", client_message);
         // Check clients function
         if (!strcmp(client_message, "B")) {
             int ack_res = char_send(sock, ack, sizeof(ack));
@@ -187,7 +181,6 @@ void *connection_handler(void *socket_desc) {
             string s;
             string out = "Available Users\n";
 
-
             while (getline(ifs, s)) {
               if (count % 2 != 0) {
                 out = out + s + "\n";
@@ -199,12 +192,15 @@ void *connection_handler(void *socket_desc) {
             strcpy(users, out.c_str());
             ifs.close();
 
+            // Sends all Available users to client
             count = char_send(sock, users, sizeof(users));
             ack_res = char_send(sock, ack, sizeof(ack));
 
+            // Receives receiver data
             char receiver[BUFSIZ];
             int private_recv = char_recv(sock, receiver, sizeof(receiver));
 
+            // Receives message data
             char message[BUFSIZ];
             int mess_recv = char_recv(sock, message, sizeof(message));
             private_chat(username, receiver, message, sock);
@@ -257,7 +253,7 @@ bool username_checker(char* username, int sockfd){
         count++;
         //check if username exists in right position
         if(!strcmp(user, username)){
-            puts("Existing user");
+            printf("%s - Attempting to login\n", username);
             int t = 0;
             status_send = int_send(t, sockfd);
             fclose(fp);
@@ -289,7 +285,6 @@ bool username_checker(char* username, int sockfd){
     char file_ending[BUFSIZ] = ".chat";
     strcat(hist_file, file_ending);
     FILE *hist_fp = fopen(hist_file, "w+");
-    printf("Created history\n");
     fclose(hist_fp);
     fclose(fp);
     return true;
@@ -320,11 +315,9 @@ bool password_checker(char* username, char* password){
           		 password[lp] = '\0';
             if(!strcmp(pass, password)){
                 //username and password already exist
-                printf("Passwords match\n");
                 return true;
             }
             else {
-              printf("Passwords do not match\n");
               return false;
             }
         }
@@ -404,6 +397,7 @@ void write_history(char* username, char* message, char* action, bool pm, char* r
      message[lp] = '\0';
 
   if (!strcmp(action, "B")) {
+    // Formats the history entry
     char action_full[BUFSIZ] = "Action: Broadcast User: ";
     strcat(hist_entry, action_full);
     strcat(hist_entry, username);
@@ -418,6 +412,7 @@ void write_history(char* username, char* message, char* action, bool pm, char* r
     strcat(re_hist_file, file_ending);
     FILE *re_hist_fp = fopen(re_hist_file, "a");
 
+    // Formats the history entry
     char action_full[BUFSIZ] = "Action: Private Message Sender: ";
     strcat(hist_entry, action_full);
     strcat(hist_entry, username);
@@ -449,6 +444,7 @@ void send_history(char* username, int  sockfd) {
   strcat(history, "\n");
   char history_line[BUFSIZ];
 
+  // Iterates through entire chat history file and puts in one string
   while(fgets(history_line, sizeof(history_line), hist_fp)){
       strcat(history, history_line);
   }
@@ -461,6 +457,7 @@ void send_history(char* username, int  sockfd) {
 
 void exit_process(char* username, int sockfd) {
 
+  // Goes through the list of active users at time of exit and puts in vect
   ifstream ifs;
   vector <string> v;
   string n, user, sock;
@@ -483,16 +480,18 @@ void exit_process(char* username, int sockfd) {
 
   ifs.close();
 
+  // Deletes the file then creates it again
   system("rm users.txt");
   system("touch users.txt");
 
-
+  // Rewrites all the users excluding the exitted user
   ofstream ofs;
   ofs.open("users.txt");
   for (vector<string>::iterator it = v.begin() ; it != v.end(); ++it) {
     ofs << *it << endl;
   }
   ofs.close();
+  printf("%s - Logged out Successfully\n", username);
 }
 
 void broadcast(char* message, int sockfd) {
@@ -501,16 +500,14 @@ void broadcast(char* message, int sockfd) {
     vector<int> socks;
 
     // Format the message
-    size_t ln = strlen(message) - 1;
-    if (message[ln] == '\n')
-      message[ln] = ' ';
     char new_mess[BUFSIZ] = "";
     strcat(new_mess, mess_format);
-    strcat(new_mess, me_format);
+    strcat(new_mess, "Message:\n");
     strcat(new_mess, message);
-    strcat(new_mess, " ");
-    strcat(new_mess, mess_format);
+    strcat(new_mess, "\n");
+    strcat(new_mess, end_mess_format);
 
+    // Goes through the list of active users and sends the message to everyone
     int count = 1;
     string n;
     int t;
@@ -532,21 +529,17 @@ void private_chat(char* sender, char* receiver, char* message, int sockfd) {
       receiver[ln] = '\0';
     write_history(sender, message, action, true, receiver);
 
-    size_t l = strlen(message) - 1;
-    if (message[l] == '\n')
-      message[l] = ' ';
-
     // Format the message
     char new_mess[BUFSIZ] = "";
     strcat(new_mess, mess_format);
-    strcat(new_mess, me_format);
-    strcat(new_mess, from_format);
+    strcat(new_mess, "From: ");
     strcat(new_mess, sender);
-    strcat(new_mess, " Message: ");
+    strcat(new_mess, "\nMessage:\n");
     strcat(new_mess, message);
-    strcat(new_mess, " ");
-    strcat(new_mess, mess_format);
+    strcat(new_mess, "\n");
+    strcat(new_mess, end_mess_format);
 
+    // Reads the active users file to check if the user exists
     ifstream ifs;
     string receivr = string(receiver);
     ifs.open("users.txt");
