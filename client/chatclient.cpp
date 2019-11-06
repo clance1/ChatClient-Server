@@ -18,9 +18,15 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
+using namespace std;
+
 #define MD5LEN 32
 #define SERVER_PORT 41036
 #define MIN(a,b) (((a)<(b)) ? (a) : (b))
+
+bool ack, confirmed, result;
+
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void *connection_handler(void *);
 int char_send(int, char*, int);
@@ -29,7 +35,8 @@ int int_send(int, int);
 int int_recv(int);
 void broadcast(int);
 void private_chat(int);
-void history(int);
+void acknowledgement_handler();
+bool confirmation_handler();
 
 int main(int argc, char *argv[]) {
     // Check argument count
@@ -63,13 +70,7 @@ int main(int argc, char *argv[]) {
 	}
 	printf("Connection established\n");
 
-	 pthread_t thread_id;
-	if(pthread_create( &thread_id , NULL ,  connection_handler , (void*) &sockfd) < 0){
-			perror("could not create thread");
-			return 1;
-	}
-
-  //recieve greeting
+	//recieve greeting
 	char greet[BUFSIZ];
 	memset(greet, 0, sizeof(greet));
 	int greet_received = char_recv(sockfd, greet, sizeof(greet));
@@ -121,49 +122,88 @@ int main(int argc, char *argv[]) {
 			printf("%s", greet);
 	}
 
-		char input[50];
-		while(strcmp(input, "X")) {
-			printf("Enter operation\n");
-			printf("B: Broadcast Messaging\nP: Private Messaging\nH: Show History\nX: Exit\n");
-			fgets(input, sizeof(input), stdin);
-			size_t l = strlen(input) - 1;
-			if (input[l] == '\n')
-				input[l] = '\0';
+	pthread_t thread_id;
+	if(pthread_create( &thread_id , NULL ,  connection_handler, (void*) &sockfd) < 0){
+			perror("could not create thread");
+			return 1;
+	}
 
-			if (!strcmp(input, "B")) {
-				printf("Broadcast selected\n");
-				broadcast(sockfd);
-			}
-			else if (!strcmp(input, "P")) {
-				printf("Private message selected\n");
-				private_chat(sockfd);
-			}
-			else if (!strcmp(input, "H")) {
-				printf("History selected\n");
-				history(sockfd);
-			}
-			else if (!strcmp(input, "X")) {
-				printf("Exiting\n");
-				char exit[BUFSIZ] = "X";
-				int exit_send = char_send(sockfd, exit, sizeof(exit));
-			}
-			else {
-				printf("Invalid Selection\n");
-			}
+	char input[50];
+	while(strcmp(input, "X")) {
+		printf("Enter operation\n");
+		printf("B: Broadcast Messaging\nP: Private Messaging\nH: Show History\nX: Exit\n");
+		fgets(input, sizeof(input), stdin);
+		size_t l = strlen(input) - 1;
+		if (input[l] == '\n')
+			input[l] = '\0';
+
+		if (!strcmp(input, "B") || !strcmp(input, "P") || !strcmp(input, "H") || !strcmp(input, "X")) {
+				int send_code = char_send(sockfd, input, sizeof(input));
 		}
-		close(sockfd);
-		return 0;
+
+		acknowledgement_handler();
+
+		if (!strcmp(input, "B")) {
+			printf("Broadcast selected\n");
+			broadcast(sockfd);
+		}
+		else if (!strcmp(input, "P")) {
+			printf("Private message selected\n");
+			private_chat(sockfd);
+		}
+		else if (!strcmp(input, "H")) {
+			printf("History selected\n");
+			acknowledgement_handler();
+		}
+		else if (!strcmp(input, "X")) {
+			printf("Exiting\n");
+			char exit[BUFSIZ] = "X";
+			int exit_send = char_send(sockfd, exit, sizeof(exit));
+		}
+		else {
+			printf("Invalid Selection\n");
+		}
+	}
+	pthread_join(thread_id, NULL);
+	close(sockfd);
+	return 0;
 }
 
-void *connection_handler(void *sockfd) {
+void *connection_handler(void *sock) {
 
-		int sock = *(int*)sockfd;
-
+		int sockfd = *(int*)sock;
 		//recieve greeting
-		char greet[BUFSIZ];
-		memset(greet, 0, sizeof(greet));
-		int greet_received = char_recv(sock, greet, sizeof(greet));
-		printf("%s", greet);
+		int count = 0;
+		while(1 && count++ < 20) {
+			char message[BUFSIZ];
+			memset(message, 0, sizeof(message));
+			int greet_received = char_recv(sockfd, message, sizeof(message));
+
+			//cout << "Message received: " << message << endl;
+			if (!strcmp(message, "ACK")) {
+				cout << "Received ack" << endl;
+				ack = true;
+			}
+			else if (!strcmp(message, "SUCCESS")) {
+				confirmed = true;
+				result = true;
+			}
+			else if (!strcmp(message, "FAILURE")) {
+				confirmed = true;
+				result = false;
+			}
+			else if (!strcmp(message, "EXIT")) {
+				break;
+			}
+			else {
+				cout << "Locking" << endl;
+				pthread_mutex_lock(&mutex);
+				printf("%s", message);
+				fflush(stdout);
+				pthread_mutex_unlock(&mutex);
+				cout << "Unlocking" << endl;
+			}
+		}
 }
 
 //send strings
@@ -214,25 +254,15 @@ int int_recv(int sockfd) {
 }
 
 void broadcast(int sockfd) {
-	// Communicate inital broadcast with server
-	char initiate[50] = "B";
-	int initate_response = char_send(sockfd, initiate, 50);
-
-	// Receive acknowledgement
-	char greet[BUFSIZ];
-	memset(greet, 0, sizeof(greet));
-	int greet_received = char_recv(sockfd, greet, sizeof(greet));
-	printf("%s", greet);
+	printf("Enter your message: \n>");
+	fflush(stdout);
 
 	// Send message
 	char message[BUFSIZ];
 	fgets(message, sizeof(message), stdin);
 	int broadcast_send = char_send(sockfd, message, sizeof(message));
 
-	// Receive confimation
-	int confirmation = int_recv(sockfd);
-
-	if (confirmation == 0) {
+	if (confirmation_handler()) {
 		printf("Broadcast Successful\n");
 	}
 	else {
@@ -241,16 +271,6 @@ void broadcast(int sockfd) {
 }
 
 void private_chat(int sockfd) {
-	// Communicate inital state with server
-	char initiate[50] = "P";
-	int initate_response = char_send(sockfd, initiate, 50);
-
-	printf("List of online users:\n");
-	// Receive acknowledgement
-	char users[BUFSIZ];
-	memset(users, 0, sizeof(users));
-	int users_received = char_recv(sockfd, users, sizeof(users));
-	printf("%s", users);
 
 	// Select user
 	char user_selected[BUFSIZ];
@@ -264,27 +284,23 @@ void private_chat(int sockfd) {
 	fgets(message, sizeof(message), stdin);
 	int message_send = char_send(sockfd, message, sizeof(message));
 
-	// Receive acknowledgement
-	int confimation = int_recv(sockfd);
-	if (confimation == 0) {
-		printf("Message sent\n");
-	}
-	else if (confimation == 1) {
-		printf("User not found\n");
+	if (confirmation_handler()) {
+		cout << "Successfully sent." << endl;
 	}
 	else {
-		printf("Miscelaneous error\n");
+		cout << "User does not exist" << endl;
 	}
 }
 
-void history(int sockfd) {
-	// Communicate inital state with server
-	char initiate[50] = "H";
-	int initate_response = char_send(sockfd, initiate, 50);
+void acknowledgement_handler() {
+	while (!ack);
 
-	// Receive History
-	char history[BUFSIZ];
-	memset(history, 0, sizeof(history));
-	int hist_received = char_recv(sockfd, history, sizeof(history));
-	printf("%s", history);
+	ack = false;
+}
+
+bool confirmation_handler() {
+	while(!confirmed);
+
+	confirmed = false;
+	return result;
 }

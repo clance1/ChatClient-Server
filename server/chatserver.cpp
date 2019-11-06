@@ -33,7 +33,11 @@ bool password_checker(char*, char*);
 void write_history(char*, char*, char*);
 void send_history(char*, int);
 void exit_process(char*, int);
-void broadcast(char*);
+void broadcast(char*, int);
+
+char* ack = "ACK";
+char* succ = "SUCCESS";
+char* fail = "FAILURE";
 
 
 int main(int argc , char *argv[]){
@@ -152,26 +156,26 @@ void *connection_handler(void *socket_desc) {
         //end of string marker
         if (client_message[sizeof(client_message)-1] == '\n')
 		        client_message[read_size] = '\0';
-        printf("Message received: %s\n", client_message);
+        printf("Action: %s\n", client_message);
         // Check clients function
         if (!strcmp(client_message, "B")) {
-            //ask for message
-            message = "Please enter your message: \n";
-            write(sock , message , strlen(message));
+            int ack_res = char_send(sock, ack, sizeof(ack));
 
             // Receive message and write to history
             char broadcast_message[BUFSIZ];
             int broadcast_recv = char_recv(sock, broadcast_message, sizeof(broadcast_message));
             write_history(username, broadcast_message, client_message);
-            printf("History written\n");
+            broadcast(broadcast_message, sock);
         }
         else if (!strcmp(client_message, "P")) {
-
+            int ack_res = char_send(sock, ack, sizeof(ack));
         }
         else if (!strcmp(client_message, "H")) {
+            int ack_res = char_send(sock, ack, sizeof(ack));
             send_history(username, sock);
         }
         else if (!strcmp(client_message, "X")) {
+            int ack_res = char_send(sock, ack, sizeof(ack));
             exit_process(username, sock);
         }
         else {
@@ -371,6 +375,7 @@ void write_history(char* username, char* message, char* action) {
     strcat(hist_entry, quote);
   }
 
+  cout << hist_entry << endl;
   fprintf(hist_fp, "%s\n", hist_entry);
   fclose(hist_fp);
 }
@@ -395,6 +400,7 @@ void send_history(char* username, int  sockfd) {
 
   printf("%s", history);
   int send_hist = char_send(sockfd, history, sizeof(history));
+  send_hist = char_send(sockfd, ack, sizeof(ack));
   fclose(hist_fp);
 }
 
@@ -436,10 +442,12 @@ void exit_process(char* username, int sockfd) {
   ofs.close();
 }
 
-void broadcast(char* message) {
+void broadcast(char* message, int sockfd) {
     ifstream ifs;
     ifs.open("users.txt");
     vector<int> socks;
+
+    strcat(message, "\n");
 
     int count = 1;
     string n;
@@ -450,4 +458,6 @@ void broadcast(char* message) {
       }
       count++;
     }
+    t = char_send(sockfd, succ, sizeof(succ));
+    ifs.close();
 }
