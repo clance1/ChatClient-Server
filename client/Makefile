@@ -1,5 +1,5 @@
 all:
-	g++ chatclient.cpp -o client_cpp -lpthread
+	g++ chatclient.cpp -o chatclient -lpthread
 
 clean:
 	-rm chatclient
