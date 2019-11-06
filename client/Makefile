@@ -1,5 +1,5 @@
 all:
-	gcc chatclient.c -o chatclient -lcrypto -lssl
+	g++ chatclient.cpp -o chatclient -lpthread
 
 clean:
 	-rm chatclient
