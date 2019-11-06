@@ -41,7 +41,7 @@ bool confirmation_handler();
 int main(int argc, char *argv[]) {
     // Check argument count
 	if(argc != 3) {
-		printf("%s: Incorrect usage.\n Usage: %s ADDR PORT \n", argv[0], argv[0]);
+		printf("%s: Incorrect usage.\n Usage: %s ADDR PORT USERNAME\n", argv[0], argv[0]);
 		exit(1);
 	}
 
@@ -76,14 +76,9 @@ int main(int argc, char *argv[]) {
 	int greet_received = char_recv(sockfd, greet, sizeof(greet));
 	printf("%s", greet);
 
-	//recieve username request
-	memset(greet, 0, sizeof(greet));
-	int username_received = char_recv(sockfd, greet, sizeof(greet));
-	printf("%s", greet);
 
 	//return username request
-	char username[50];
-	fgets(username, 50, stdin);
+	char username[50] = argv[3];
 	printf("Entered username:%s", username);
 	int username_sent = char_send(sockfd, username, strlen(username));
 
