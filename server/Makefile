@@ -1,5 +1,6 @@
 all:
-	g++ -std=c++11 chatserver.cpp -o chatserver -lpthread
+	gcc chatserver.c -o chatserver -lcrypto -lssl -lpthread
 
 clean:
 	-rm chatserver
+
