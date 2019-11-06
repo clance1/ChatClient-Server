@@ -129,10 +129,6 @@ void *connection_handler(void *socket_desc) {
     //while loop handles username checking
     while (!usercheck){
 
-        //ask for username
-        message = "Please enter your username: \n";
-        write(sock , message , strlen(message));
-
         //receive username
         memset(username, 0, sizeof(username));
 	      int username_received = char_recv(sock, username, sizeof(username));
