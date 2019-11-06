@@ -19,6 +19,7 @@
 #include<iostream>
 #include<cstdio>
 #include<iterator>
+#include<cstring>
 
 using namespace std;
 
@@ -30,14 +31,18 @@ int int_send(int, int);
 int int_recv(int);
 bool username_checker(char*, int);
 bool password_checker(char*, char*);
-void write_history(char*, char*, char*);
+void write_history(char*, char*, char*, bool, char*);
 void send_history(char*, int);
 void exit_process(char*, int);
 void broadcast(char*, int);
+void private_chat(char*, char*, char*, int);
 
 char* ack = "ACK";
 char* succ = "SUCCESS";
 char* fail = "FAILURE";
+char* mess_format = "################## ";
+char* from_format = " Message received from ";
+char* me_format = "New Message! ";
 
 
 int main(int argc , char *argv[]){
@@ -74,6 +79,11 @@ int main(int argc , char *argv[]){
     puts("Waiting for incoming connections...");
     c = sizeof(struct sockaddr_in);
 	  pthread_t thread_id;
+
+    // Running into errors with repeated users when failing
+    system("rm users.txt");
+    system("touch users.txt");
+
 
     //While loop will accept multiple clients
     while((client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c))){
@@ -130,7 +140,7 @@ void *connection_handler(void *socket_desc) {
     while(!passcheck){
         //ask for password
         message = "Please enter your password: \n";
-        write(sock , message , strlen(message));
+        int blah = char_send(sock , message , strlen(message));
 
         //receive password
         char password[BUFSIZ];
@@ -149,7 +159,7 @@ void *connection_handler(void *socket_desc) {
     fclose(users_fp);
 
     message = "Login Successful\n";
-    write(sock, message, strlen(message));
+    int blah = char_send(sock, message, strlen(message));
 
     //Receive a message from client
     while((read_size = recv(sock , client_message , 2000 , 0)) > 0 ) {
@@ -164,11 +174,40 @@ void *connection_handler(void *socket_desc) {
             // Receive message and write to history
             char broadcast_message[BUFSIZ];
             int broadcast_recv = char_recv(sock, broadcast_message, sizeof(broadcast_message));
-            write_history(username, broadcast_message, client_message);
+            write_history(username, broadcast_message, client_message, false, NULL);
             broadcast(broadcast_message, sock);
         }
         else if (!strcmp(client_message, "P")) {
             int ack_res = char_send(sock, ack, sizeof(ack));
+            ifstream ifs;
+            ifs.open("users.txt");
+
+            strcat(client_message, "\n");
+            int count = 1;
+            string s;
+            string out = "Available Users\n";
+
+
+            while (getline(ifs, s)) {
+              if (count % 2 != 0) {
+                out = out + s + "\n";
+              }
+              count++;
+            }
+
+            char users[BUFSIZ];
+            strcpy(users, out.c_str());
+            ifs.close();
+
+            count = char_send(sock, users, sizeof(users));
+            ack_res = char_send(sock, ack, sizeof(ack));
+
+            char receiver[BUFSIZ];
+            int private_recv = char_recv(sock, receiver, sizeof(receiver));
+
+            char message[BUFSIZ];
+            int mess_recv = char_recv(sock, message, sizeof(message));
+            private_chat(username, receiver, message, sock);
         }
         else if (!strcmp(client_message, "H")) {
             int ack_res = char_send(sock, ack, sizeof(ack));
@@ -176,10 +215,9 @@ void *connection_handler(void *socket_desc) {
         }
         else if (!strcmp(client_message, "X")) {
             int ack_res = char_send(sock, ack, sizeof(ack));
+            char exit_stat[BUFSIZ] = "EXIT";
+            int exit_res = char_send(sock, exit_stat, sizeof(exit_stat));
             exit_process(username, sock);
-        }
-        else {
-
         }
     }
 
@@ -339,7 +377,7 @@ int int_recv(int sockfd) {
 	return temp;
 }
 
-void write_history(char* username, char* message, char* action) {
+void write_history(char* username, char* message, char* action, bool pm, char* receive) {
   char hist_file[BUFSIZ];
   strcpy(hist_file, username);
   char space[BUFSIZ] = " ";
@@ -374,8 +412,25 @@ void write_history(char* username, char* message, char* action) {
     strcat(hist_entry, message);
     strcat(hist_entry, quote);
   }
+  else if (!strcmp(action, "P")) {
+    char re_hist_file[BUFSIZ];
+    strcpy(re_hist_file, receive);
+    strcat(re_hist_file, file_ending);
+    FILE *re_hist_fp = fopen(re_hist_file, "a");
 
-  cout << hist_entry << endl;
+    char action_full[BUFSIZ] = "Action: Private Message Sender: ";
+    strcat(hist_entry, action_full);
+    strcat(hist_entry, username);
+    char private_add[BUFSIZ] = " Receiver: ";
+    strcat(hist_entry, private_add);
+    strcat(hist_entry, receive);
+    strcat(hist_entry, space);
+    strcat(hist_entry, mess);
+    strcat(hist_entry, message);
+    strcat(hist_entry, quote);
+    fprintf(re_hist_fp, "%s\n", hist_entry);
+    fclose(re_hist_fp);
+  }
   fprintf(hist_fp, "%s\n", hist_entry);
   fclose(hist_fp);
 }
@@ -398,7 +453,6 @@ void send_history(char* username, int  sockfd) {
       strcat(history, history_line);
   }
 
-  printf("%s", history);
   int send_hist = char_send(sockfd, history, sizeof(history));
   send_hist = char_send(sockfd, ack, sizeof(ack));
   fclose(hist_fp);
@@ -424,7 +478,6 @@ void exit_process(char* username, int sockfd) {
     else if (n.compare(sock) == 0) {
       continue;
     }
-    cout << n << "." << endl;
     v.push_back(n);
   }
 
@@ -447,17 +500,67 @@ void broadcast(char* message, int sockfd) {
     ifs.open("users.txt");
     vector<int> socks;
 
-    strcat(message, "\n");
+    // Format the message
+    size_t ln = strlen(message) - 1;
+    if (message[ln] == '\n')
+      message[ln] = ' ';
+    char new_mess[BUFSIZ] = "";
+    strcat(new_mess, mess_format);
+    strcat(new_mess, me_format);
+    strcat(new_mess, message);
+    strcat(new_mess, " ");
+    strcat(new_mess, mess_format);
 
     int count = 1;
     string n;
     int t;
     while (getline(ifs, n)) {
       if (count % 2 == 0) {
-        t = char_send(stoi(n), message, sizeof(message));
+        t = char_send(stoi(n), new_mess, sizeof(new_mess));
       }
       count++;
     }
+
     t = char_send(sockfd, succ, sizeof(succ));
     ifs.close();
+}
+
+void private_chat(char* sender, char* receiver, char* message, int sockfd) {
+    char action[BUFSIZ] = "P";
+    size_t ln = strlen(receiver) - 1;
+    if (receiver[ln] == '\n')
+      receiver[ln] = '\0';
+    write_history(sender, message, action, true, receiver);
+
+    size_t l = strlen(message) - 1;
+    if (message[l] == '\n')
+      message[l] = ' ';
+
+    // Format the message
+    char new_mess[BUFSIZ] = "";
+    strcat(new_mess, mess_format);
+    strcat(new_mess, me_format);
+    strcat(new_mess, from_format);
+    strcat(new_mess, sender);
+    strcat(new_mess, " Message: ");
+    strcat(new_mess, message);
+    strcat(new_mess, " ");
+    strcat(new_mess, mess_format);
+
+    ifstream ifs;
+    string receivr = string(receiver);
+    ifs.open("users.txt");
+
+    string n;
+    int t;
+
+    while (getline(ifs, n)) {
+      if (n.compare(receivr) == 0) {
+        getline(ifs, n);
+        t = char_send(stoi(n), new_mess, sizeof(new_mess));
+        t = char_send(sockfd, succ, sizeof(succ));
+        return;
+      }
+    }
+    t = char_send(sockfd, fail, sizeof(fail));
 }
